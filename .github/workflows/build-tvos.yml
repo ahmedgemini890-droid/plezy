@@ -5,10 +5,21 @@ on:
 
 jobs:
   build-tvos:
-    runs-on: macos-14
+    runs-on: macos-26
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun swiftc --version
+          xcrun --sdk appletvos --show-sdk-version
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
