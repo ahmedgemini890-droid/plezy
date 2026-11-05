@@ -1,0 +1,54 @@
+name: Build Official Plezy tvOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-tvos:
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: "3.47.1"
+          cache: true
+
+      - name: Fetch tvOS custom engine
+        run: |
+          chmod +x tvos/scripts/fetch_engine.sh
+          ./tvos/scripts/fetch_engine.sh
+
+      - name: Install dependencies and Pods
+        run: |
+          flutter pub get
+          cd tvos
+          chmod +x scripts/pod_install.sh
+          ./scripts/pod_install.sh
+
+      - name: Build tvOS Archive
+        run: |
+          xcodebuild archive \
+            -workspace tvos/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination 'generic/platform=tvOS' \
+            -archivePath build/Runner.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package Payload to IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/Runner.xcarchive/Products/Applications/*.app Payload/
+          zip -r Plezy-tvOS.ipa Payload
+
+      - name: Upload tvOS IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Plezy-tvOS
+          path: Plezy-tvOS.ipa
