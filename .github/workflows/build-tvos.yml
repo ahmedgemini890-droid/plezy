@@ -32,41 +32,26 @@ jobs:
       - name: Fix tvOS StoreKit2 winBackOffers
         run: |
           python3 -c "
-          import re, os
+          import re
 
           p1 = 'tvos/Runner/Plugins/in_app_purchase_storekit/InAppPurchasePlugin+StoreKit2.swift'
-          if os.path.exists(p1):
-              with open(p1, 'r') as f:
-                  c = f.read()
-              c = c.replace(
-                  'if #available(iOS 18.0, macOS 15.0, *) {\n          if let winBackOfferId = options?.winBackOfferId,\n            let winBackOffer = product.subscription?.winBackOffers.first(where: {\n              $0.id == winBackOfferId\n            })\n          {\n            purchaseOptions.insert(.winBackOffer(winBackOffer))\n          }\n        }',
-                  '#if !os(tvOS)\n        if #available(iOS 18.0, macOS 15.0, *) {\n          if let winBackOfferId = options?.winBackOfferId,\n            let winBackOffer = product.subscription?.winBackOffers.first(where: {\n              $0.id == winBackOfferId\n            })\n          {\n            purchaseOptions.insert(.winBackOffer(winBackOffer))\n          }\n        }\n#endif'
-              )
-              pattern = r'let isEligible = try await subscription\.status\.contains.*?completion\(\.success\(isEligible\)\)'
-              c = re.sub(
-                  pattern,
-                  '#if !os(tvOS)\n          let isEligible = try await subscription.status.contains { status in if case .verified(let renewalInfo) = status.renewalInfo { return renewalInfo.eligibleWinBackOfferIDs.contains(offerId) }\n return false }\n completion(.success(isEligible))\n#else\n          completion(.success(false))\n#endif',
-                  c,
-                  flags=re.DOTALL
-              )
-              with open(p1, 'w') as f:
-                  f.write(c)
+          with open(p1, 'r') as f:
+              c1 = f.read()
+          c1 = re.sub(r'if #available\([^)]*\)\s*\{\s*if let winBackOfferId = options\?\.winBackOfferId.*?purchaseOptions\.insert\(\.winBackOffer\(winBackOffer\)\)\s*\}\s*\}', '#if !os(tvOS)\n        /* winback */\n#endif', c1, flags=re.DOTALL)
+          c1 = re.sub(r'let isEligible = try await subscription\.status\.contains.*?completion\(\.success\(isEligible\)\)', '#if !os(tvOS)\n          let isEligible = try await subscription.status.contains { status in if case .verified(let renewalInfo) = status.renewalInfo { return renewalInfo.eligibleWinBackOfferIDs.contains(offerId) }\n return false }\n completion(.success(isEligible))\n#else\n          completion(.success(false))\n#endif', c1, flags=re.DOTALL)
+          with open(p1, 'w') as f:
+              f.write(c1)
 
           p2 = 'tvos/Runner/Plugins/in_app_purchase_storekit/StoreKit2Translators.swift'
-          if os.path.exists(p2):
-              with open(p2, 'r') as f:
-                  c2 = f.read()
-              c2 = c2.replace(
-                  'if #available(iOS 18.0, macOS 15.0, *) {\n      allOffers.append(contentsOf: winBackOffers.map { $0.convertToPigeon })\n    }',
-                  '#if !os(tvOS)\n    if #available(iOS 18.0, macOS 15.0, *) {\n      allOffers.append(contentsOf: winBackOffers.map { $0.convertToPigeon })\n    }\n#endif'
-              )
-              c2 = c2.replace(
-                  'if #available(iOS 18.0, macOS 15.0, *) {\n        if self == .winBack {\n          return SK2SubscriptionOfferTypeMessage.winBack\n        }\n      }',
-                  '#if !os(tvOS)\n      if #available(iOS 18.0, macOS 15.0, *) {\n        if self == .winBack {\n          return SK2SubscriptionOfferTypeMessage.winBack\n        }\n      }\n#endif'
-              )
-              with open(p2, 'w') as f:
-                  f.write(c2)
-          print('StoreKit2 tvOS patch verified and applied successfully!')
+          with open(p2, 'r') as f:
+              c2 = f.read()
+          c2 = re.sub(r'if #available\([^)]*\)\s*\{\s*allOffers\.append\(contentsOf:\s*winBackOffers.*?\n\s*\}', '#if !os(tvOS)\n    /* winback */\n#endif', c2, flags=re.DOTALL)
+          c2 = re.sub(r'if #available\([^)]*\)\s*\{\s*if self == \.winBack\s*\{.*?\n\s*\}\s*\}', '#if !os(tvOS)\n        /* winback */\n#endif', c2, flags=re.DOTALL)
+          with open(p2, 'w') as f:
+              f.write(c2)
+
+          print('Patched StoreKit2 successfully! winBack count:', c1.count('winBack') + c2.count('winBack'))
+          assert (c1.count('winBack') + c2.count('winBack')) == 0, 'Failed to remove winBack'
           "
 
       - name: Build tvOS Archive
