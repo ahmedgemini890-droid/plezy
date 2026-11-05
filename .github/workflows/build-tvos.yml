@@ -39,6 +39,7 @@ jobs:
               c1 = f.read()
           c1 = re.sub(r'if #available\([^)]*\)\s*\{\s*if let winBackOfferId = options\?\.winBackOfferId.*?purchaseOptions\.insert\(\.winBackOffer\(winBackOffer\)\)\s*\}\s*\}', '#if !os(tvOS)\n        /* winback */\n#endif', c1, flags=re.DOTALL)
           c1 = re.sub(r'let isEligible = try await subscription\.status\.contains.*?completion\(\.success\(isEligible\)\)', '#if !os(tvOS)\n          let isEligible = try await subscription.status.contains { status in if case .verified(let renewalInfo) = status.renewalInfo { return renewalInfo.eligibleWinBackOfferIDs.contains(offerId) }\n return false }\n completion(.success(isEligible))\n#else\n          completion(.success(false))\n#endif', c1, flags=re.DOTALL)
+          c1 = re.sub(r'if let compactJWS = options\?\.introductoryOfferEligibilityCompactJWS\s*\{\s*purchaseOptions\.insert\(\.introductoryOfferEligibility\(compactJWS: compactJWS\)\)\s*\}', '#if !os(tvOS)\n        /* introductoryOfferEligibility */\n#endif', c1, flags=re.DOTALL)
           with open(p1, 'w') as f:
               f.write(c1)
 
@@ -50,8 +51,9 @@ jobs:
           with open(p2, 'w') as f:
               f.write(c2)
 
-          print('Patched StoreKit2 successfully! winBack count:', c1.count('winBack') + c2.count('winBack'))
-          assert (c1.count('winBack') + c2.count('winBack')) == 0, 'Failed to remove winBack'
+          print('StoreKit2 tvOS patches applied cleanly!')
+          assert c1.count('winBack') == 0 and c2.count('winBack') == 0, 'winBack remains'
+          assert 'introductoryOfferEligibility(compactJWS' not in c1, 'introductoryOfferEligibility remains'
           "
 
       - name: Build tvOS Archive
